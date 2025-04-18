@@ -11,11 +11,13 @@ model = joblib.load("phishing_model.pkl")
 # Feature extraction function
 def extract_features(url):
     return {
+        "url_length": len(url),
         "https": int(url.startswith("https")),
         "num_digits": sum(char.isdigit() for char in url),
         "num_special_chars": sum(1 for char in url if not char.isalnum() and char != '/'),
         "num_subdomains": url.count(".") - 1
     }
+
 
 
 @app.route("/predict", methods=["POST"])
@@ -29,10 +31,11 @@ def predict():
 
         features = extract_features(url)
 
-        expected_features = ["https", "num_digits", "num_special_chars", "num_subdomains"]
-        input_row = [features[f] for f in expected_features]
+        expected_features = ["url_length", "https", "num_digits", "num_special_chars", "num_subdomains"]
 
+        input_row = [features[f] for f in expected_features]
         input_df = pd.DataFrame([input_row], columns=expected_features)
+
 
         prediction = model.predict(input_df)[0]
 
