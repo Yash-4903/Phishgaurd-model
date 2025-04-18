@@ -1,55 +1,52 @@
 from flask import Flask, request, jsonify
-import joblib
 import pandas as pd
+import joblib
 
 app = Flask(__name__)
 
-# Load trained ML model
+# Load trained model
 model = joblib.load("phishing_model.pkl")
 
-# Feature extraction function
-def extract_features(url):
-    return {
-        "url_length": len(url),
-        "num_digits": sum(char.isdigit() for char in url),
-        "num_special_chars": sum(1 for char in url if not char.isalnum() and char != '/'),
-        "num_subdomains": url.count(".") - 1,
-        "https": int(url.startswith("https")),
-    }
+# Features used during training (same order)
+EXPECTED_FEATURES = [
+    'having_IP_Address',
+    'URL_Length',
+    'Shortining_Service',
+    'having_At_Symbol',
+    'double_slash_redirecting'
+    # ➕ Add other feature names from phishing.csv if any
+]
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
     return jsonify({"message": "PhishGuard Model API is running"}), 200
 
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
-        data = request.json
-        url = data.get("url", "")
+        data = request.get_json()
 
-        if not url:
-            return jsonify({"error": "No URL provided"}), 400
+        # Validate that all expected features are present
+        if not all(f in data for f in EXPECTED_FEATURES):
+            return jsonify({
+                "error": "Missing one or more required features",
+                "required_features": EXPECTED_FEATURES
+            }), 400
 
-        # Extract and order features correctly
-        features = extract_features(url)
-        expected_features = ['url_length', 'num_digits', 'num_special_chars', 'num_subdomains', 'https']
-        input_row = [features[f] for f in expected_features]
-        input_df = pd.DataFrame([input_row], columns=expected_features)
+        # Create DataFrame in correct column order
+        input_row = [data[f] for f in EXPECTED_FEATURES]
+        input_df = pd.DataFrame([input_row], columns=EXPECTED_FEATURES)
 
-        # Predict using the trained model
         prediction = model.predict(input_df)[0]
 
         return jsonify({
-            "is_phishing": bool(prediction),
-            "url": url
+            "is_phishing": bool(prediction == 1),
+            "prediction": int(prediction)
         })
 
     except Exception as e:
         print("❌ Prediction error:", str(e))
-        return jsonify({
-            "error": "Prediction failed",
-            "message": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
