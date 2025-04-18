@@ -5,7 +5,7 @@ import pandas as pd
 app = Flask(__name__)
 
 # Load trained ML model
-model = joblib.load("phishing_model.pkl")
+model = joblib.load("phishingdetection.pkl")
 
 # Feature extraction function
 def extract_features(url):
